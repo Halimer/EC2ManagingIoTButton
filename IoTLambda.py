@@ -61,5 +61,5 @@ def toggle_instances(ec2, instance_list, dry_run, current_status_name):
                 response_value = toggle_instances(ec2, [instance_id], dryRun, status_name)
                 print("     Starting up Instances "+str(response_value))
                 
-						else:
+			else:
             	print("     Click type not set: " + click_type)
