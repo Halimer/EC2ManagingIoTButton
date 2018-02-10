@@ -25,7 +25,9 @@ us_aws_regions = {'us-east-1', 'us-east-2','us-west-1', 'us-west-2'}
 
 
 ## Want to change this to an enviroment variable
-dryRun = False
+DRYRUN = True
+DEBUGGING = True
+
 
 # --------------- Helper Sart and stop intances ----------------------
 # Logic: iterrates through regions and instances building a list per region
@@ -43,7 +45,7 @@ def start_stop_ec2_instances(action,instance_state):
 	for aws_region in us_aws_regions:
 		print(aws_region)
 		
-		instances_to_action = 0		
+		count_of_instances_to_action = 0		
 		
 		ec2 = boto3.client('ec2',region_name=aws_region)
 		#Getting Running Instances Should also add a Tag Filter
@@ -53,32 +55,40 @@ def start_stop_ec2_instances(action,instance_state):
 			{'Name': 'tag-value' , 'Values': ['Frugal']}])
 	
 		reservations = raw_response['Reservations']
-		print(reservations)
+		#print(reservations)
 
 		
 		print(len(reservations))
 		for raw_instance in reservations:
-			instances_to_stop = []
+			instances_to_action = []
 			for instance in raw_instance['Instances']:
 				print(instance['InstanceId'])
-				instances_to_stop.append(instance['InstanceId'])
+				instances_to_action.append(instance['InstanceId'])
 				
 				# Count of all instances that will be actioned
-				instances_to_action = instances_to_action + 1 
+				count_of_instances_to_action = count_of_instances_to_action + 1 
 				
-			print(instances_to_stop)
+			print(instances_to_action)
+			print("Count of Instances to action: " + str(count_of_instances_to_action))
 			
 			try:
-				if instances_to_action == 1000:
-					ec2 = boto3.client('ec2', region_name=aws_region)
-					response = ec2.stop_instances(InstanceIds=region_instances,DryRun=DRYRUN)
+				if count_of_instances_to_action > 0 and action == 'shutdown':
+					# ec2 = boto3.client('ec2', region_name=aws_region)
+					print("Shutdown")
+					response = ec2.stop_instances(InstanceIds=instances_to_action,DryRun=DRYRUN)
+					print("Instances shutdown")
+				elif count_of_instances_to_action > 0 and action == 'startup':
+					response = ec2.start_instances(InstanceIds=instances_to_action,DryRun=DRYRUN)
+					print("Instances started")
+				else:
+					print("Nothing to do!")
 			except ClientError as e:
-				if dry_run and e.response['Error'].get('Code') == 'DryRunOperation':
+				if DRYRUN and e.response['Error'].get('Code') == 'DryRunOperation':
 					was_successful = True
 				else:
 					print(e)
 	 
-	print("Instances to action: " + str(instances_to_action))
+	print("Instances to action: " + str(count_of_instances_to_action))
 	
 	
 	## Determining if there are instances
@@ -273,6 +283,9 @@ def on_session_ended(session_ended_request, session):
 
 # --------------- Main handler ------------------
 
+start_stop_ec2_instances('shutdown','running')
+
+
 def lambda_handler(event, context):
 	""" Route the incoming request based on type (LaunchRequest, IntentRequest,
 	etc.) The JSON body of the request is provided in the event parameter.
@@ -300,3 +313,4 @@ def lambda_handler(event, context):
 		return on_intent(event['request'], event['session'])
 	elif event['request']['type'] == "SessionEndedRequest":
 		return on_session_ended(event['request'], event['session'])
+		
