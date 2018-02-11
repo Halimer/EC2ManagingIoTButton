@@ -4,7 +4,6 @@ The Intent Schema, Custom Slots, and Sample Utterances for this skill, as well
 as testing instructions are located at http://amzn.to/1LzFrj6
 
 For additional samples, visit the Alexa Skills Kit Getting Started guide at
-http://amzn.to/1LGWsLG
 """
 
 from __future__ import print_function
@@ -16,17 +15,20 @@ from botocore.exceptions import ClientError
 
 
 # --------------- Global Variables  ----------------------
-
-DEBUGGING = os.environ.get("DEBUGGING", None)
-DRYRUN = os.environ.get("DRYRUN", None)
-
-## Want to change this to an environment variable or something automated
+DRYRUN = False
+DEBUGGING = True
 us_aws_regions = {'us-east-1', 'us-east-2','us-west-1', 'us-west-2'}
 
 
-## Want to change this to an enviroment variable
-DRYRUN = True
-DEBUGGING = True
+# --------------- Debugging ----------------------
+# Logic: If DEBUGGING is True print
+# Varialbles: Output Text
+# Action: Print
+# Returns: Null
+# --------------------------------------------------
+def debugging(output_text):
+	if DEBUGGING:
+		print(output_text)
 
 
 # --------------- Helper Sart and stop intances ----------------------
@@ -36,14 +38,16 @@ DEBUGGING = True
 #						Action: can be Shutdown or Startup
 # 					Instance_state: running or stopped (other types not as useful)
 # Returns: Alexa card of how many instances have been actioned
+# ----------------------------------------------------------------------
 
 def start_stop_ec2_instances(action,instance_state):
 	
 	
 	total_instances_actioned = 0
-	print('Instance state is: ' + instance_state)
+	
+	debugging('Instance state is: ' + instance_state)
 	for aws_region in us_aws_regions:
-		print(aws_region)
+		debugging(aws_region)
 		
 		count_of_instances_to_action = 0		
 		
@@ -58,28 +62,30 @@ def start_stop_ec2_instances(action,instance_state):
 		#print(reservations)
 
 		
-		print(len(reservations))
+		debugging("Lengthing of res: " + str(len(reservations)))
 		for raw_instance in reservations:
 			instances_to_action = []
 			for instance in raw_instance['Instances']:
-				print(instance['InstanceId'])
+				debugging(instance['InstanceId'])
 				instances_to_action.append(instance['InstanceId'])
 				
 				# Count of all instances that will be actioned
 				count_of_instances_to_action = count_of_instances_to_action + 1 
 				
-			print(instances_to_action)
-			print("Count of Instances to action: " + str(count_of_instances_to_action))
+			debugging(instances_to_action)
+			debugging("Count of Instances to action: " + str(count_of_instances_to_action))
 			
 			try:
 				if count_of_instances_to_action > 0 and action == 'shutdown':
 					# ec2 = boto3.client('ec2', region_name=aws_region)
-					print("Shutdown")
+					debugging("Shutdown")
+					total_instances_actioned = total_instances_actioned + count_of_instances_to_action
 					response = ec2.stop_instances(InstanceIds=instances_to_action,DryRun=DRYRUN)
-					print("Instances shutdown")
-				elif count_of_instances_to_action > 0 and action == 'startup':
+					debugging("Instances shutdown")
+				elif count_of_instances_to_action > 0 and action == 'started':
+					total_instances_actioned = total_instances_actioned + count_of_instances_to_action
 					response = ec2.start_instances(InstanceIds=instances_to_action,DryRun=DRYRUN)
-					print("Instances started")
+					debugging("Instances started")
 				else:
 					print("Nothing to do!")
 			except ClientError as e:
@@ -88,7 +94,7 @@ def start_stop_ec2_instances(action,instance_state):
 				else:
 					print(e)
 	 
-	print("Instances to action: " + str(count_of_instances_to_action))
+	debugging("Instances to action: " + str(count_of_instances_to_action))
 	
 	
 	## Determining if there are instances
@@ -171,63 +177,6 @@ def handle_session_end_request():
 
 
 
-# --------------- Color game functions not in use ----------------------
-
-
-def create_favorite_color_attributes(favorite_color):
-	return {"favoriteColor": favorite_color}
-
-
-def set_color_in_session(intent, session):
-	""" Sets the color in the session and prepares the speech to reply to the
-	user.
-	"""
-
-	card_title = intent['name']
-	session_attributes = {}
-	should_end_session = False
-
-	if 'Color' in intent['slots']:
-		favorite_color = intent['slots']['Color']['value']
-		session_attributes = create_favorite_color_attributes(favorite_color)
-		speech_output = "I now know your favorite color is " + \
-			favorite_color + \
-			". You can ask me your favorite color by saying, " \
-			"what's my favorite color?"
-		reprompt_text = "You can ask me your favorite color by saying, " \
-			"what's my favorite color?"
-	else:
-		speech_output = "I'm not sure what your favorite color is. " \
-			"Please try again."
-		reprompt_text = "I'm not sure what your favorite color is. " \
-			"You can tell me your favorite color by saying, " \
-			"my favorite color is red."
-	
-	return build_response(session_attributes, build_speechlet_response(
-		card_title, speech_output, reprompt_text, should_end_session))
-
-
-def get_color_from_session(intent, session):
-	session_attributes = {}
-	reprompt_text = None
-
-	if session.get('attributes', {}) and "favoriteColor" in session.get('attributes', {}):
-		favorite_color = session['attributes']['favoriteColor']
-		speech_output = "Your favorite color is " + favorite_color + \
-			". Goodbye."
-		should_end_session = True
-	else:
-		speech_output = "I'm not sure what your favorite color is. " \
-			"You can say, my favorite color is red."
-		should_end_session = False
-
-	# Setting reprompt_text to None signifies that we do not want to reprompt
-	# the user. If the user does not respond or says something that is not
-	# understood, the session will end.
-	return build_response(session_attributes, build_speechlet_response(
-		intent['name'], speech_output, reprompt_text, should_end_session))
-
-
 # --------------- Events ------------------
 
 def on_session_started(session_started_request, session):
@@ -282,8 +231,6 @@ def on_session_ended(session_ended_request, session):
 
 
 # --------------- Main handler ------------------
-
-start_stop_ec2_instances('shutdown','running')
 
 
 def lambda_handler(event, context):
